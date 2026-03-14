@@ -12,6 +12,19 @@ interface MyStoriesProps {
 
 const WORLD_ORDER = Object.keys(WORLDS) as WorldMode[];
 const WORLD_MAP = WORLDS as Record<string, (typeof WORLDS)[WorldMode]>;
+const SHELF_ORDER = [
+  "Облачко Пушинка",
+  "Бабочка Искорка",
+  "Ева Мечтательница + Тимур Облачный",
+  "Жемчужинка",
+  "История из Русская сказка",
+  "Мышонок Пик",
+  "Росинка"
+];
+const SHELF_MERGE_MAP: Record<string, string> = {
+  "Ева Мечтательница": "Ева Мечтательница + Тимур Облачный",
+  "Тимур Облачный": "Ева Мечтательница + Тимур Облачный"
+};
 
 function normalizeWorldMode(mode?: string) {
   if (mode === "fairy_tale") return "fairytale";
@@ -24,54 +37,55 @@ function getWorldByMode(mode?: string) {
   return WORLD_MAP[normalized] || null;
 }
 
-function sortStories(stories: Story[]): Story[] {
-  const getWorldIndex = (worldMode?: string) => {
-    const normalized = normalizeWorldMode(worldMode);
-    if (!normalized) return Number.MAX_SAFE_INTEGER;
-    const index = WORLD_ORDER.indexOf(normalized as WorldMode);
-    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
-  };
-
-  return [...stories].sort((a, b) => {
-    const worldIndexA = getWorldIndex(a.worldMode);
-    const worldIndexB = getWorldIndex(b.worldMode);
-    if (worldIndexA !== worldIndexB) return worldIndexA - worldIndexB;
-
-    const worldA = getWorldByMode(a.worldMode);
-    const worldB = getWorldByMode(b.worldMode);
-    const worldNameA = worldA?.name || "Другие";
-    const worldNameB = worldB?.name || "Другие";
-    if (worldNameA !== worldNameB) return worldNameA.localeCompare(worldNameB);
-
-    return (a.title || "").localeCompare(b.title || "");
-  });
+function getAgeRank(ageLabel?: string) {
+  if (!ageLabel) return Number.MAX_SAFE_INTEGER;
+  const match = ageLabel.match(/\d+/);
+  return match ? parseInt(match[0], 10) : Number.MAX_SAFE_INTEGER;
 }
 
-function groupByWorld(stories: Story[]): Array<{ worldMode: WorldMode | null; worldName: string; stories: Story[] }> {
-  const groups = new Map<string, Story[]>();
+function getShelfKey(title: string) {
+  return SHELF_MERGE_MAP[title] || title;
+}
+
+function getUpdatedAtValue(updatedAt?: string) {
+  if (!updatedAt) return 0;
+  const parsed = Date.parse(updatedAt);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function buildShelves(stories: Story[]): Array<{ title: string; ageRank: number; stories: Story[] }> {
+  const groups = new Map<string, { title: string; ageRank: number; stories: Story[] }>();
 
   stories.forEach((story) => {
-    const worldMode = story.worldMode || null;
-    const world = getWorldByMode(worldMode || undefined);
-    const worldName = world?.name || "Другие";
-    if (!groups.has(worldName)) {
-      groups.set(worldName, []);
+    const key = getShelfKey(story.title);
+    const ageRank = getAgeRank(story.ageLabel);
+    if (!groups.has(key)) {
+      groups.set(key, { title: key, ageRank, stories: [] });
     }
-    groups.get(worldName)!.push(story);
+    const group = groups.get(key)!;
+    group.ageRank = Math.min(group.ageRank, ageRank);
+    group.stories.push(story);
   });
 
-  const orderedWorlds = WORLD_ORDER.map((mode) => ({
-    worldMode: mode,
-    worldName: WORLDS[mode].name,
-    stories: groups.get(WORLDS[mode].name) || []
-  })).filter((group) => group.stories.length > 0);
+  const shelves = Array.from(groups.values());
+  shelves.sort((a, b) => {
+    if (a.ageRank !== b.ageRank) return a.ageRank - b.ageRank;
+    const indexA = SHELF_ORDER.indexOf(a.title);
+    const indexB = SHELF_ORDER.indexOf(b.title);
+    if (indexA !== -1 || indexB !== -1) {
+      return (indexA === -1 ? Number.MAX_SAFE_INTEGER : indexA) - (indexB === -1 ? Number.MAX_SAFE_INTEGER : indexB);
+    }
+    return a.title.localeCompare(b.title);
+  });
 
-  const otherStories = groups.get("Другие");
-  if (otherStories && otherStories.length > 0) {
-    orderedWorlds.push({ worldMode: null, worldName: "Другие", stories: otherStories });
-  }
+  shelves.forEach((shelf) => {
+    shelf.stories.sort((a, b) => {
+      if (a.title !== b.title) return a.title.localeCompare(b.title);
+      return getUpdatedAtValue(b.updatedAt) - getUpdatedAtValue(a.updatedAt);
+    });
+  });
 
-  return orderedWorlds;
+  return shelves;
 }
 
 function shortText(text?: string, maxLength: number = 90) {
@@ -83,8 +97,7 @@ function shortText(text?: string, maxLength: number = 90) {
 }
 
 export function MyStories({ stories, onSelectStory, onNewStory, onDeleteStory: _onDeleteStory, onBack }: MyStoriesProps) {
-  const sortedStories = sortStories(stories);
-  const worldGroups = groupByWorld(sortedStories);
+  const shelves = buildShelves(stories);
 
   return (
     <div style={{
@@ -118,7 +131,7 @@ export function MyStories({ stories, onSelectStory, onNewStory, onDeleteStory: _
           </button>
         </div>
 
-        {sortedStories.length === 0 ? (
+        {shelves.length === 0 ? (
           <div className="empty-state">
             <p>У вас ещё нет историй.</p>
             <p>Создайте первую историю — начните со сказки, приключения или магии!</p>
@@ -128,11 +141,11 @@ export function MyStories({ stories, onSelectStory, onNewStory, onDeleteStory: _
           </div>
         ) : (
           <div className="stories-shelves">
-            {worldGroups.map((group) => (
-              <div key={group.worldName} className="world-shelf">
-                <h2 className="shelf-title">{group.worldName}</h2>
+            {shelves.map((shelf) => (
+              <div key={shelf.title} className="world-shelf">
+                <h2 className="shelf-title">{shelf.title}</h2>
                 <div className="stories-grid">
-                  {group.stories.map((story) => {
+                  {shelf.stories.map((story) => {
                     const world = getWorldByMode(story.worldMode);
                     const ageLabel = story.ageLabel || world?.ageLabel || "Возраст не указан";
                     return (

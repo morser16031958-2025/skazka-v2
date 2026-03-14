@@ -12,6 +12,7 @@ export interface ChapterNode {
   scene_image_url: string;
   choices: Choice[];
   state_summary: string;
+  selectedChoiceText?: string;
 }
 
 export interface Story {

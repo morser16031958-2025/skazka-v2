@@ -11,19 +11,106 @@ interface StoryReaderProps {
   onBack: () => void;
 }
 
+const STOP_WORDS = new Set([
+  "и",
+  "в",
+  "на",
+  "по",
+  "к",
+  "с",
+  "а",
+  "но",
+  "или",
+  "что",
+  "как",
+  "мы",
+  "вы",
+  "он",
+  "она",
+  "они",
+  "это",
+  "то",
+  "за",
+  "для",
+  "же",
+  "ли",
+  "да"
+]);
+
+function tokenize(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-zа-я0-9\s]/gi, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 3 && !STOP_WORDS.has(word));
+}
+
+function buildReferenceText(nextChapter: ChapterNode | null) {
+  if (!nextChapter) return "";
+  return [nextChapter.title, nextChapter.narration_text, nextChapter.state_summary]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function guessSelectedChoice(choices: ChapterNode["choices"], nextChapter: ChapterNode | null) {
+  if (!choices?.length || !nextChapter) return null;
+  const referenceTokens = new Set(tokenize(buildReferenceText(nextChapter)));
+  let best: string | null = null;
+  let bestScore = 0;
+
+  choices.forEach((choice) => {
+    const tokens = tokenize(choice.text);
+    const score = tokens.reduce((acc, token) => acc + (referenceTokens.has(token) ? 1 : 0), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = choice.text;
+    }
+  });
+
+  return bestScore > 0 ? best : null;
+}
+
+function getNextChapter(story: Story, current: ChapterNode | null) {
+  if (!current) return null;
+  const index = story.chapters.findIndex((node) => node.id === current.id);
+  if (index === -1) return null;
+  return story.chapters[index + 1] || null;
+}
+
 export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps) {
   const [loading, setLoading] = useState(false);
   const [selectedChoices, setSelectedChoices] = useState<Set<string>>(new Set());
   const chapter = story.currentChapter;
   const world = story.worldMode ? WORLDS[story.worldMode] : null;
   const defaultBg = world?.backgroundColor || "#1a0f00";
+  const nextChapter = getNextChapter(story, chapter);
+  const inferredChoice = chapter?.selectedChoiceText || guessSelectedChoice(chapter?.choices, nextChapter);
+  const visibleChoices = nextChapter && inferredChoice
+    ? chapter?.choices.filter((choice) => choice.text === inferredChoice) || []
+    : chapter?.choices || [];
 
   useEffect(() => {
-    setSelectedChoices(new Set());
-  }, [chapter?.id, story.id]);
+    if (!chapter) {
+      setSelectedChoices(new Set());
+      return;
+    }
+    setSelectedChoices(inferredChoice ? new Set([inferredChoice]) : new Set());
+  }, [chapter?.id, story.id, story.chapters, inferredChoice]);
 
   const handleChoiceSelect = async (choiceText: string) => {
     if (loading) return;
+
+    if (selectedChoices.has(choiceText)) {
+      const nextChapter = getNextChapter(story, chapter);
+      if (nextChapter) {
+        onChapterUpdate({
+          ...story,
+          currentChapter: nextChapter,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      return;
+    }
 
     setLoading(true);
     setSelectedChoices(prev => new Set([...prev, choiceText]));
@@ -62,9 +149,13 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
         state_summary: response.state_summary_end,
       };
 
+      const updatedChapters = story.chapters.map((node) =>
+        node.id === chapter.id ? { ...node, selectedChoiceText: choiceText } : node
+      );
+
       const updatedStory: Story = {
         ...story,
-        chapters: [...story.chapters, newChapter],
+        chapters: [...updatedChapters, newChapter],
         currentChapter: newChapter,
         updatedAt: new Date().toISOString(),
       };
@@ -124,7 +215,7 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
         <div className="choices-section">
           <h2 className="choices-title">Что будет дальше?</h2>
           <div className="choices-grid">
-            {chapter.choices?.map((choice) => (
+            {visibleChoices.map((choice) => (
               <button
                 key={choice.id}
                 className={`choice-button ${selectedChoices.has(choice.text) ? 'choice-selected' : ''}`}
