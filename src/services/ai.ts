@@ -1,6 +1,11 @@
-import { WorldMode, WORLDS } from "../config/worlds";
+import { Genre, GENRES } from "../config/worlds";
 
 const MIN_REQUEST_INTERVAL = 1000;
+
+function resolveGenre(mode: string) {
+  const normalized = mode === "fairy_tale" ? "fairytale" : mode;
+  return GENRES[normalized as Genre] || GENRES.fairytale;
+}
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -23,7 +28,10 @@ class RequestQueue {
         }
       });
 
-      this.processQueue();
+      // Issue 5: Catch errors from processQueue
+      this.processQueue().catch((err) => {
+        console.error("[RequestQueue] processQueue error:", err);
+      });
     });
   }
 
@@ -100,15 +108,19 @@ export interface WorldSetupResponse {
  * Генерировать текст главы
  */
 export async function generateChapter(
-  worldMode: WorldMode,
+  worldMode: Genre,
   worldBible: string,
   heroBible: string,
   antagonistBible: string,
   stateSummary: string,
   choiceText?: string
 ): Promise<ChapterResponse> {
-  const world = WORLDS[worldMode];
-  const systemPrompt = world.systemPrompt;
+  const world = resolveGenre(worldMode);
+  const systemPrompt = `Ты — автор детских историй в жанре "${world.name}".
+Конфликт главы: ${world.conflictType}.
+Сохраняй мягкий тон и ясность.
+Возвращай только валидный JSON по схеме. Никакого текста вне JSON.
+Используй русский язык.`;
 
   const prompt = `Напиши следующую главу истории.
 Мир: ${worldBible}.
@@ -117,14 +129,32 @@ export async function generateChapter(
 Текущее состояние: ${stateSummary}.
 ${choiceText ? `Выбор читателя: ${choiceText}` : "Это первая глава."}
 
-Длина текста: ${world.textLength.min}-${world.textLength.max} символов.
+Длина текста: 800-1200 символов.
 Верни JSON: title, narration_text, scene_image_prompt, choices (ровно 3), state_summary_end.`;
 
-  return callLocalApi<ChapterResponse>("/api/ai/generate-chapter", {
+  const response = await callLocalApi<any>("/api/ai/generate-chapter", {
     worldMode,
     systemPrompt,
     prompt,
   });
+
+  // Issue 7: Validate required fields and normalize choice format
+  if (!response.title || !response.narration_text || !Array.isArray(response.choices) || response.choices.length === 0) {
+    throw new Error("Invalid chapter response: missing required fields (title, narration_text, or choices)");
+  }
+
+  // Normalize choices: server sends button_text but we expect text
+  const normalizedChoices = response.choices.map((c: any) => ({
+    text: c.text || c.button_text || "",
+  }));
+
+  return {
+    title: response.title,
+    narration_text: response.narration_text,
+    scene_image_prompt: response.scene_image_prompt || "",
+    choices: normalizedChoices,
+    state_summary_end: response.state_summary_end || "",
+  };
 }
 
 /**
@@ -147,9 +177,9 @@ export async function generateImage(prompt: string, styleSuffix?: string): Promi
  * Генерировать мир, героя и антагониста одновременно
  */
 export async function generateWorldSetup(
-  worldMode: WorldMode
+  worldMode: Genre
 ): Promise<WorldSetupResponse> {
-  const world = WORLDS[worldMode];
+  const world = resolveGenre(worldMode);
   const descriptionSystemPrompt = `Ты создаёшь краткие описания для детских историй. Возвращай только валидный JSON с полем "description". Используй русский язык.`;
 
   // Три параллельных запроса для описаний
@@ -157,12 +187,12 @@ export async function generateWorldSetup(
     callLocalApi<{ description: string }>("/api/ai/generate-chapter", {
       worldMode,
       systemPrompt: descriptionSystemPrompt,
-      prompt: `Создай краткое описание волшебного мира для ${world.ageLabel}. ${world.description}. Верни JSON с полем "description".`,
+      prompt: `Создай краткое описание мира в жанре "${world.name}". ${world.description}. Конфликт: ${world.conflictType}. Верни JSON с полем "description".`,
     }),
     callLocalApi<{ description: string }>("/api/ai/generate-chapter", {
       worldMode,
       systemPrompt: descriptionSystemPrompt,
-      prompt: `Создай описание главного героя для истории в мире: "${world.name}". Герой должен быть интересным для ${world.ageLabel}. Верни JSON с полем "description".`,
+      prompt: `Создай описание главного героя для истории в жанре "${world.name}". Верни JSON с полем "description".`,
     }),
     callLocalApi<{ description: string }>("/api/ai/generate-chapter", {
       worldMode,

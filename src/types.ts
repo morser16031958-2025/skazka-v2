@@ -1,4 +1,4 @@
-import { WorldMode } from "./config/worlds";
+import { Genre } from "./config/worlds";
 
 export interface Choice {
   id: string;
@@ -18,7 +18,7 @@ export interface ChapterNode {
 export interface Story {
   id: string;
   title: string;
-  worldMode: WorldMode;
+  worldMode: Genre;
   ageLabel?: string;
   worldDescription: string;
   heroDescription: string;

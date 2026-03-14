@@ -1,79 +1,66 @@
-export type WorldMode = "fairytale" | "adventure" | "magic";
+export type Genre =
+  "fairytale" | "animals" | "magic_soft" |
+  "magic" | "adventure" | "fantasy";
+
+export type AgeGroup =
+  "3-5" | "6-8" | "9-12" | "13+" | "auto";
 
 export interface WorldConfig {
-  id: WorldMode;
+  id: Genre;
   name: string;
-  ageLabel: string;
   description: string;
-  buttonText: string;
-  systemPrompt: string;
+  conflictType: "испытание" | "тайна" | "препятствие" | "моральный выбор";
   imageStyleSuffix: string;
-  textLength: { min: number; max: number };
   accentColor: string;
-  backgroundColor: string;
 }
 
-export const WORLDS: Record<WorldMode, WorldConfig> = {
-
+export const GENRES: Record<Genre, WorldConfig> = {
   fairytale: {
     id: "fairytale",
-    name: "Русская сказка",
-    ageLabel: "3 – 7 лет",
-    description: "Жар-птицы, добрые молодцы и тридевятые царства",
-    buttonText: "Открыть",
-    systemPrompt: `Ты — сказитель русских народных сказок.
-Говори напевно, используй повторы ("шёл-шёл и нашёл", "думал-думал").
-Герои простые и понятные: добрый молодец, жар-птица, баба-яга.
-Конфликт всегда мягкий — испытание, а не угроза.
-Добро всегда побеждает, финал тёплый и радостный.
-Длина текста: 400-800 символов — коротко, ритмично.
-Возвращай только валидный JSON по схеме. Никакого текста вне JSON.
-Используй русский язык.`,
-    imageStyleSuffix: "Palekh miniature style, russian folk art, gold and crimson palette, warm painterly illustration",
-    textLength: { min: 400, max: 800 },
+    name: "Русские народные",
+    description: "Жар-птицы, Бабы-яги и тридевятые царства",
+    conflictType: "испытание",
+    imageStyleSuffix: "russian folk art, Palekh style, warm gold crimson",
     accentColor: "#b07820",
-    backgroundColor: "#1a0f00",
   },
-
-  adventure: {
-    id: "adventure",
-    name: "Большое приключение",
-    ageLabel: "8 – 12 лет",
-    description: "Карты, квесты и выборы с настоящими последствиями",
-    buttonText: "Войти",
-    systemPrompt: `Ты — автор приключенческих историй для детей.
-Мир полон загадок, карт и испытаний которые нужно преодолеть.
-Герой умный и смелый, но не всесильный — ошибается и учится.
-Выборы имеют реальные последствия — можно выбрать неверный путь.
-Юмор уместен, диалоги живые и динамичные.
-Длина текста: 800-1500 символов.
-Возвращай только валидный JSON по схеме. Никакого текста вне JSON.
-Используй русский язык.`,
-    imageStyleSuffix: "adventure map style, watercolor illustration, bright vivid colors, dynamic composition",
-    textLength: { min: 800, max: 1500 },
-    accentColor: "#1a7850",
-    backgroundColor: "#001a0a",
+  animals: {
+    id: "animals",
+    name: "Про животных",
+    description: "Добрые лисы, мудрые совы и храбрые ёжики",
+    conflictType: "препятствие",
+    imageStyleSuffix: "cute animals illustration, warm watercolor, children book",
+    accentColor: "#4a8c3f",
   },
-
+  magic_soft: {
+    id: "magic_soft",
+    name: "Волшебство",
+    description: "Феи, единороги и добрые чародеи",
+    conflictType: "тайна",
+    imageStyleSuffix: "soft magical fantasy, pastel colors, fairy tale illustration",
+    accentColor: "#8855cc",
+  },
   magic: {
     id: "magic",
-    name: "Магический портал",
-    ageLabel: "13+ лет",
-    description: "Тайные миры, древние силы и магия которую нужно открыть",
-    buttonText: "Шагнуть",
-    systemPrompt: `Ты — автор волшебных историй о тайных мирах и магических приключениях.
-Мир живой, древний, полный тайн — за обычным скрывается необычное.
-Герой особенный — видит то что другие не замечают.
-Магия подчиняется правилам которые нужно открыть — не всесильная, а живая система.
-Каждая глава открывает что-то новое: секрет, способность, скрытый смысл.
-Каждая глава заканчивается на пороге нового открытия — читатель хочет продолжения.
-Антагонист — хранитель тайны или тот кто ищет другим путём, не злодей.
-Длина текста: 1500-3000 символов.
-Возвращай только валидный JSON по схеме. Никакого текста вне JSON.
-Используй русский язык.`,
-    imageStyleSuffix: "magical fantasy illustration, ethereal mystical lighting, ancient symbols, portals, atmospheric wonder",
-    textLength: { min: 1500, max: 3000 },
-    accentColor: "#6040b0",
-    backgroundColor: "#0a0015",
+    name: "Магия",
+    description: "Тайные миры, академии и древние силы",
+    conflictType: "тайна",
+    imageStyleSuffix: "dark magical fantasy, ethereal lighting, mystical world",
+    accentColor: "#5030a0",
+  },
+  adventure: {
+    id: "adventure",
+    name: "Приключения",
+    description: "Карты, квесты и испытания в пути",
+    conflictType: "препятствие",
+    imageStyleSuffix: "adventure illustration, watercolor map style, vivid colors",
+    accentColor: "#1a7850",
+  },
+  fantasy: {
+    id: "fantasy",
+    name: "Фантастика",
+    description: "Роботы, космос и будущее человечества",
+    conflictType: "моральный выбор",
+    imageStyleSuffix: "sci-fi illustration, futuristic, space and technology",
+    accentColor: "#1a5fa0",
   },
 };

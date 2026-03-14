@@ -6,7 +6,9 @@
       "Bash(npm run:*)",
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(curl:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

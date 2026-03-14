@@ -1,110 +1,88 @@
-import { motion, Variants } from "framer-motion";
-import { WORLDS, WorldMode } from "../config/worlds";
+import { useState } from "react";
+import { GENRES, Genre, AgeGroup } from "../config/worlds";
 import "./DoorSelect.css";
 
 interface DoorSelectProps {
-  onSelect: (worldMode: WorldMode) => void;
-  onBack: () => void;
+  onSelect: (genre: Genre, ageGroup: AgeGroup) => void;
 }
 
-const WORLD_IMAGES: Record<WorldMode, string> = {
-  fairytale: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800",
-  adventure: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800",
-  magic: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800",
-};
+const AGE_GROUPS: Array<{ id: AgeGroup; label: string }> = [
+  { id: "3-5", label: "3-5 лет" },
+  { id: "6-8", label: "6-8 лет" },
+  { id: "9-12", label: "9-12 лет" },
+  { id: "13+", label: "13+" },
+  { id: "auto", label: "AI решит" },
+];
 
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.5,
-      ease: "easeOut",
-    },
-  },
-};
-
-const titleVariants: Variants = {
-  hidden: { opacity: 0, y: -20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.6,
-      ease: "easeOut",
-    },
-  },
-};
-
-export function DoorSelect({ onSelect, onBack }: DoorSelectProps) {
-  const worldModes = Object.keys(WORLDS) as WorldMode[];
+export function DoorSelect({ onSelect }: DoorSelectProps) {
+  const genres = Object.keys(GENRES) as Genre[];
+  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
+  const [ageGroup, setAgeGroup] = useState<AgeGroup>("auto");
 
   return (
     <div className="door-select">
       <div className="door-background" />
       <div className="door-overlay" />
-
-      <button className="door-back-button" onClick={onBack}>
-        ← Назад
-      </button>
       
-      <motion.h1
-        className="main-title"
-        variants={titleVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        Начни свою сказку
-      </motion.h1>
+      <div className="door-header">
+        <h1 className="main-title">Выбери свой мир</h1>
+      </div>
 
-      <motion.div
-        className="cards-container"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        {worldModes.map((worldMode) => {
-          const world = WORLDS[worldMode];
+      <div className="genre-grid">
+        {genres.map((genre) => {
+          const item = GENRES[genre];
+          const isSelected = selectedGenre === genre;
           return (
-            <motion.button
-              key={worldMode}
-              className="world-card"
-              variants={itemVariants}
-              onClick={() => onSelect(worldMode)}
-              whileHover={{ translateY: -6 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+            <button
+              key={genre}
+              type="button"
+              className={`genre-card ${isSelected ? "selected" : ""}`}
+              style={{
+                borderColor: isSelected ? item.accentColor : "rgba(255,255,255,0.1)",
+                backgroundColor: isSelected ? `${item.accentColor}26` : "rgba(255,255,255,0.05)",
+              }}
+              onClick={() => setSelectedGenre(genre)}
             >
-              <img
-                src={WORLD_IMAGES[worldMode]}
-                alt={world.name}
-                className="card-bg-image"
-              />
-              <div className="card-gradient" />
-              <div className="card-content">
-                <span
-                  className="card-age"
-                  style={{ color: world.accentColor }}
-                >
-                  {world.ageLabel}
-                </span>
-                <h2 className="card-title">{world.name}</h2>
-                <p className="card-description">{world.description}</p>
+              <div className="genre-title-row">
+                {isSelected && (
+                  <span className="genre-dot" style={{ backgroundColor: item.accentColor }} />
+                )}
+                <span className="genre-title">{item.name}</span>
               </div>
-            </motion.button>
+              <span className="genre-description">{item.description}</span>
+            </button>
           );
         })}
-      </motion.div>
+      </div>
+
+      <div className="age-block">
+        <span className="age-title">Для кого создаем?</span>
+        <div className="age-pills">
+          {AGE_GROUPS.map((group) => {
+            const isActive = ageGroup === group.id;
+            return (
+              <button
+                key={group.id}
+                type="button"
+                className={`age-pill ${isActive ? "active" : ""}`}
+                onClick={() => setAgeGroup(group.id)}
+              >
+                {group.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {selectedGenre && (
+        <button
+          className="next-button"
+          type="button"
+          onClick={() => onSelect(selectedGenre, ageGroup)}
+        >
+          Дальше →
+        </button>
+      )}
     </div>
   );
 }

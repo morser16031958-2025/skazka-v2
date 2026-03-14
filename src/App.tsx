@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Story } from "./types";
-import { WorldMode } from "./config/worlds";
+import { Genre, AgeGroup } from "./config/worlds";
 import { Landing } from "./components/Landing";
 import { DoorSelect } from "./components/DoorSelect";
 import { StoryWizard } from "./components/StoryWizard";
@@ -16,7 +16,8 @@ function App() {
   const [screen, setScreen] = useState<AppScreen>("landing");
   const [stories, setStories] = useState<Story[]>([]);
   const [currentStory, setCurrentStory] = useState<Story | null>(null);
-  const [selectedWorldMode, setSelectedWorldMode] = useState<WorldMode | null>(null);
+  const [selectedWorldMode, setSelectedWorldMode] = useState<Genre | null>(null);
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroup>("auto");
 
   const loadStories = async () => {
     try {
@@ -44,8 +45,9 @@ function App() {
     }
   }, [screen]);
 
-  const handleDoorSelect = (worldMode: WorldMode) => {
+  const handleDoorSelect = (worldMode: Genre, ageGroup: AgeGroup) => {
     setSelectedWorldMode(worldMode);
+    setSelectedAgeGroup(ageGroup);
     setScreen("wizard");
   };
 
@@ -176,12 +178,13 @@ function App() {
       )}
 
       {screen === "menu" && (
-        <DoorSelect onSelect={handleDoorSelect} onBack={() => setScreen("landing")} />
+        <DoorSelect onSelect={handleDoorSelect} />
       )}
 
       {screen === "wizard" && selectedWorldMode && (
         <StoryWizard
           worldMode={selectedWorldMode}
+          ageGroup={selectedAgeGroup}
           onStoryCreated={handleStoryCreated}
           onCancel={handleBackToMenu}
         />

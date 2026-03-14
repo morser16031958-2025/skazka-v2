@@ -1,5 +1,4 @@
 import { Story } from "../types";
-import { WorldMode, WORLDS } from "../config/worlds";
 import "./MyStories.css";
 
 interface MyStoriesProps {
@@ -10,8 +9,6 @@ interface MyStoriesProps {
   onBack: () => void;
 }
 
-const WORLD_ORDER = Object.keys(WORLDS) as WorldMode[];
-const WORLD_MAP = WORLDS as Record<string, (typeof WORLDS)[WorldMode]>;
 const SHELF_ORDER = [
   "Облачко Пушинка",
   "Бабочка Искорка",
@@ -25,17 +22,6 @@ const SHELF_MERGE_MAP: Record<string, string> = {
   "Ева Мечтательница": "Ева Мечтательница + Тимур Облачный",
   "Тимур Облачный": "Ева Мечтательница + Тимур Облачный"
 };
-
-function normalizeWorldMode(mode?: string) {
-  if (mode === "fairy_tale") return "fairytale";
-  return mode;
-}
-
-function getWorldByMode(mode?: string) {
-  const normalized = normalizeWorldMode(mode);
-  if (!normalized) return null;
-  return WORLD_MAP[normalized] || null;
-}
 
 function getAgeRank(ageLabel?: string) {
   if (!ageLabel) return Number.MAX_SAFE_INTEGER;
@@ -146,8 +132,7 @@ export function MyStories({ stories, onSelectStory, onNewStory, onDeleteStory: _
                 <h2 className="shelf-title">{shelf.title}</h2>
                 <div className="stories-grid">
                   {shelf.stories.map((story) => {
-                    const world = getWorldByMode(story.worldMode);
-                    const ageLabel = story.ageLabel || world?.ageLabel || "Возраст не указан";
+                    const ageLabel = story.ageLabel || "Возраст не указан";
                     return (
                       <button
                         key={story.id}

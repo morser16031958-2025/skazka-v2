@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { WorldMode, WORLDS } from "../config/worlds";
+import { Genre, GENRES, AgeGroup } from "../config/worlds";
 import { Story } from "../types";
 import { generateWorldSetup } from "../services/ai";
 import "./StoryWizard.css";
 
 interface StoryWizardProps {
-  worldMode: WorldMode;
+  worldMode: Genre;
+  ageGroup: AgeGroup;
   onStoryCreated: (story: Story) => void;
   onCancel: () => void;
 }
@@ -18,8 +19,8 @@ const STAGES = [
   "🎨 Рисуем иллюстрации..."
 ];
 
-export function StoryWizard({ worldMode, onStoryCreated, onCancel }: StoryWizardProps) {
-  const world = WORLDS[worldMode];
+export function StoryWizard({ worldMode, ageGroup, onStoryCreated, onCancel }: StoryWizardProps) {
+  const world = GENRES[worldMode];
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"generating" | "preview">("generating");
   const [story, setStory] = useState<Partial<Story> | null>(null);
@@ -61,7 +62,7 @@ export function StoryWizard({ worldMode, onStoryCreated, onCancel }: StoryWizard
         id: uuidv4(),
         title: `История из ${world.name}`,
         worldMode,
-        ageLabel: world.ageLabel,
+        ageLabel: ageGroup,
         worldDescription: setup.worldDescription,
         heroDescription: setup.heroDescription,
         antagonistDescription: setup.antagonistDescription,

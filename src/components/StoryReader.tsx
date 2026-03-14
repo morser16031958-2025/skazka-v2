@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Story, ChapterNode } from "../types";
 import { generateChapter, generateImage } from "../services/ai";
-import { WORLDS } from "../config/worlds";
+import { GENRES, Genre } from "../config/worlds";
 import "./StoryReader.css";
 
 interface StoryReaderProps {
@@ -77,18 +77,32 @@ function getNextChapter(story: Story, current: ChapterNode | null) {
   return story.chapters[index + 1] || null;
 }
 
+function resolveGenre(mode?: string) {
+  if (!mode) return null;
+  const normalized = mode === "fairy_tale" ? "fairytale" : mode;
+  return GENRES[normalized as Genre] || null;
+}
+
 export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps) {
   const [loading, setLoading] = useState(false);
   const [selectedChoices, setSelectedChoices] = useState<Set<string>>(new Set());
   const [isFlipping, setIsFlipping] = useState(false);
   const chapter = story.currentChapter;
-  const world = story.worldMode ? WORLDS[story.worldMode] : null;
-  const defaultBg = world?.backgroundColor || "#1a0f00";
+  const world = resolveGenre(story.worldMode);
+  const defaultBg = "#1a0f00";
   const nextChapter = getNextChapter(story, chapter);
   const inferredChoice = chapter?.selectedChoiceText || guessSelectedChoice(chapter?.choices, nextChapter);
-  const visibleChoices = nextChapter && inferredChoice
-    ? chapter?.choices.filter((choice) => choice.text === inferredChoice) || []
-    : [];
+
+  // Issue 4: Determine visible choices based on story state
+  let visibleChoices = chapter?.choices || [];
+  if (nextChapter && inferredChoice && chapter?.choices) {
+    // Has next chapter and inferred choice → show only selected
+    visibleChoices = chapter.choices.filter((choice) => choice.text === inferredChoice);
+  } else if (!nextChapter) {
+    // No next chapter (last chapter) → show all choices
+    visibleChoices = chapter?.choices || [];
+  }
+  // If has next chapter but no inference → show all choices (default already set)
 
   useEffect(() => {
     if (!chapter) {

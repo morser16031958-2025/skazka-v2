@@ -12,6 +12,7 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const DB_PATH = path.join(__dirname, "tales.db");
 const DATA_DIR = path.join(__dirname, "data");
+const RESOLVED_DATA_DIR = path.resolve(DATA_DIR);
 const IMAGES_DIR = path.join(DATA_DIR, "images");
 const AUDIO_DIR = path.join(DATA_DIR, "audio");
 
@@ -57,21 +58,32 @@ db.exec(`
 const count = db.prepare("SELECT COUNT(*) as count FROM stories").get() as { count: number };
 console.log(`Database initialized. Found ${count.count} stories.`);
 
+// SQL injection protection: whitelist of valid column names
+const VALID_COLUMNS = new Set([
+  'story_id', 'created_at', 'updated_at', 'world_mode', 'age_label',
+  'world_description', 'hero_description', 'antagonist_description',
+  'world_image', 'hero_image', 'antagonist_image', 'title', 'chapters_json'
+]);
+
 // Проверяем и исправляем схему базы данных
 try {
   // Проверяем существование колонки world_mode
   const tableInfo = db.prepare("PRAGMA table_info(stories)").all() as Array<{name: string, type: string}>;
   const hasWorldMode = tableInfo.some(col => col.name === 'world_mode');
-  
+
   if (!hasWorldMode) {
     console.log("Adding missing world_mode column to stories table...");
     db.prepare("ALTER TABLE stories ADD COLUMN world_mode TEXT").run();
     console.log("Added world_mode column successfully.");
   }
-  
-  // Проверяем другие колонки
+
+  // Проверяем другие колонки (только из whitelist)
   const requiredColumns = ['age_label', 'world_description', 'hero_description', 'antagonist_description', 'world_image', 'hero_image', 'antagonist_image', 'chapters_json'];
   for (const column of requiredColumns) {
+    if (!VALID_COLUMNS.has(column)) {
+      console.warn(`Skipping unknown column: ${column}`);
+      continue;
+    }
     const hasColumn = tableInfo.some(col => col.name === column);
     if (!hasColumn) {
       console.log(`Adding missing ${column} column to stories table...`);
@@ -87,11 +99,12 @@ try {
 function deleteAssetFile(assetPath: string | null) {
   if (!assetPath || assetPath.startsWith("data:")) return;
   try {
-    const filePath = path.resolve(DATA_DIR, assetPath.replace("/assets/", ""));
-    // Защита от path traversal
-    if (!filePath.startsWith(path.resolve(DATA_DIR))) return;
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    const normalized = path.normalize(path.resolve(DATA_DIR, assetPath.replace("/assets/", "")));
+    // Защита от path traversal: проверка что нормализованный путь находится в разрешённой директории
+    const isInDataDir = normalized === RESOLVED_DATA_DIR || normalized.startsWith(RESOLVED_DATA_DIR + path.sep);
+    if (!isInDataDir) return;
+    if (fs.existsSync(normalized)) {
+      fs.unlinkSync(normalized);
     }
   } catch (e) {
     console.warn("Failed to delete asset file:", assetPath, e);
@@ -285,6 +298,36 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_TEXT_MODEL = process.env.OPENROUTER_TEXT_MODEL || "google/gemini-2.5-flash";
 const OPENROUTER_IMAGE_MODEL = process.env.OPENROUTER_IMAGE_MODEL || "google/gemini-2.5-flash-image";
 const AI_PROVIDER = (process.env.AI_PROVIDER || (OPENROUTER_API_KEY ? "openrouter" : "n1n")).toLowerCase();
+const DEFAULT_SYSTEM_INSTRUCTION = `Ты — популярный детский писатель, чутко понимающий 
+психологию ребёнка, создающий понятные, яркие и 
+волшебные сказки. 
+
+## Стиль повествования 
+Используй технику "Зуммирования": описывай детали мира — 
+архитектуру, запахи, звуки, текстуры, историю предметов — 
+чтобы каждая сцена была живой и чувственной. 
+Не заполняй объём водой — каждая деталь должна работать 
+на атмосферу или сюжет. 
+
+## Правила 
+- Учитывай возраст (age_group): 
+  3-5 — простые яркие образы, короткие предложения, повторы; 
+  6-8 — яркие образы с деталями: запах, цвет, звук; 
+  9-12 — пиши как для взрослого, но в сказочном жанре; 
+  auto — выбери стиль сам исходя из жанра. 
+- Показывай ценность через события и поступки, 
+  без морали в лоб. 
+- Конфликт всегда в духе жанра: для сказок — испытание, 
+  для фантастики — моральный выбор, и т.д. 
+- Используй русский язык. 
+- Возвращай только валидный JSON. 
+  Никакого текста вне JSON. 
+- РОВНО 3 варианта выборов — не меньше, не больше.`;
+
+function cleanPromptText(value: unknown) {
+  if (!value) return "";
+  return String(value).replace(/\s+/g, " ").trim();
+}
 
 async function sleep(ms: number) {
   return new Promise<void>(resolve => setTimeout(resolve, ms));
@@ -344,8 +387,14 @@ async function callN1nJson(prompt: string, systemPrompt: string, model: string =
       const content = data?.choices?.[0]?.message?.content;
       if (!content) throw new Error("Empty response from N1N");
 
-      let result = JSON.parse(content.trim().replace(/^```json\n?/, '').replace(/\n?```$/, ''));
-      return result;
+      try {
+        let result = JSON.parse(content.trim().replace(/^```json\n?/, '').replace(/\n?```$/, ''));
+        return result;
+      } catch (parseError) {
+        const rawContent = content.substring(0, 200);
+        console.error(`[N1N] JSON parse failed. Raw content: ${rawContent}`);
+        throw new Error(`Invalid JSON from N1N: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+      }
 
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
@@ -465,8 +514,14 @@ async function callOpenRouterJson(prompt: string, systemPrompt: string, model: s
       const content = data?.choices?.[0]?.message?.content;
       if (!content) throw new Error("Empty response from OpenRouter");
 
-      const result = JSON.parse(content.trim().replace(/^```json\n?/, '').replace(/\n?```$/, ''));
-      return result;
+      try {
+        const result = JSON.parse(content.trim().replace(/^```json\n?/, '').replace(/\n?```$/, ''));
+        return result;
+      } catch (parseError) {
+        const rawContent = content.substring(0, 200);
+        console.error(`[OpenRouter] JSON parse failed. Raw content: ${rawContent}`);
+        throw new Error(`Invalid JSON from OpenRouter: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+      }
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
       console.error(`[OpenRouter] Attempt ${attempt + 1} failed:`, lastError);
@@ -532,19 +587,95 @@ async function callOpenRouterImage(prompt: string, model: string = OPENROUTER_IM
 // API: Генерировать главу
 app.post("/api/ai/generate-chapter", async (req, res) => {
   try {
-    const { worldMode, systemPrompt, prompt } = req.body;
+    const {
+      genre,
+      ageGroup = "auto",
+      valueTheme,
+      antiValueTheme,
+      worldBible,
+      heroBible,
+      antagonistBible,
+      stateSummary,
+      choiceText,
+      storyId,
+      provider,
+      prompt,
+      systemPrompt,
+    } = req.body;
 
-    if (!systemPrompt || !prompt) {
-      return res.status(400).json({ error: "Missing systemPrompt or prompt" });
+    if (prompt && systemPrompt && !genre) {
+      const resolvedSystemPrompt = systemPrompt || DEFAULT_SYSTEM_INSTRUCTION;
+      const result = AI_PROVIDER === "openrouter"
+        ? await callOpenRouterJson(prompt, resolvedSystemPrompt)
+        : await callN1nJson(prompt, resolvedSystemPrompt);
+      res.json(result);
+      return;
     }
 
-    const result = AI_PROVIDER === "openrouter"
-      ? await callOpenRouterJson(prompt, systemPrompt)
-      : await callN1nJson(prompt, systemPrompt);
+    if (!genre) {
+      return res.status(400).json({ error: "Missing genre" });
+    }
+
+    const cleanWorldBible = cleanPromptText(worldBible);
+    const cleanHeroBible = cleanPromptText(heroBible);
+    const cleanAntagBible = cleanPromptText(antagonistBible);
+    const resolvedSystemPrompt = systemPrompt || DEFAULT_SYSTEM_INSTRUCTION;
+    const resolvedValueTheme = valueTheme || "не указано";
+    const resolvedAntiValueTheme = antiValueTheme || "не указано";
+    const resolvedStateSummary = stateSummary || "История только начинается";
+    const generatedPrompt = `Напиши следующую главу сказки. 
+Жанр: ${genre}. 
+Возраст читателя: ${ageGroup}. 
+Ценность: ${resolvedValueTheme}. 
+Антиценность: ${resolvedAntiValueTheme}. 
+Мир: ${cleanWorldBible}. 
+Герой: ${cleanHeroBible}. 
+Антагонист: ${cleanAntagBible}. 
+Текущее состояние: ${resolvedStateSummary}. 
+${choiceText ? `Выбор читателя: ${choiceText}` : "Это первая глава."} 
+Длина: 3000-3500 символов. 
+РОВНО 3 варианта выборов. 
+Верни JSON: chapter_id, title, narration_text, 
+scene_image_prompt, choices (3 объекта: choice_id, 
+button_text, intent_tag), state_summary_end.`;
+
+    const selectedProvider = (provider || AI_PROVIDER).toLowerCase();
+    const result = selectedProvider === "openrouter"
+      ? await callOpenRouterJson(generatedPrompt, resolvedSystemPrompt)
+      : await callN1nJson(generatedPrompt, resolvedSystemPrompt);
     res.json(result);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: e instanceof Error ? e.message : "Failed to generate chapter" });
+  }
+});
+
+app.post("/api/ai/generate-world", async (req, res) => {
+  try {
+    const { genre, ageGroup = "auto", valueTheme, provider, systemPrompt } = req.body;
+    if (!genre) {
+      return res.status(400).json({ error: "Missing genre" });
+    }
+
+    const resolvedSystemPrompt = systemPrompt || DEFAULT_SYSTEM_INSTRUCTION;
+    const resolvedValueTheme = valueTheme || "не указано";
+    const prompt = `Сгенерируй 3 варианта волшебного мира. 
+Жанр: ${genre}. 
+Возраст: ${ageGroup}. 
+Ценность: ${resolvedValueTheme}. 
+Верни JSON: world_options (3 объекта: id, name, 
+description_short, description_long, world_rules, 
+visual_style, cover_image_prompt, 
+hero_description, conflict_description).`;
+
+    const selectedProvider = (provider || AI_PROVIDER).toLowerCase();
+    const result = selectedProvider === "openrouter"
+      ? await callOpenRouterJson(prompt, resolvedSystemPrompt)
+      : await callN1nJson(prompt, resolvedSystemPrompt);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e instanceof Error ? e.message : "Failed to generate world" });
   }
 });
 
@@ -595,6 +726,13 @@ async function setupVite() {
 // Start server
 async function start() {
   await setupVite();
+
+  // Issue 6: Warn if no API keys are configured
+  if (!N1N_API_KEY && !OPENROUTER_API_KEY) {
+    console.warn("\n⚠️  WARNING: No AI API keys configured!");
+    console.warn("   Set N1N_API_KEY or OPENROUTER_API_KEY in .env file");
+    console.warn("   AI features will not work without valid API keys.\n");
+  }
 
   app.listen(PORT, () => {
     console.log(`✓ Server running on http://localhost:${PORT}`);
