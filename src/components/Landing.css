@@ -2,18 +2,18 @@
   min-height: 100vh;
   position: relative;
   overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 .landing-background {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   background-image: url('/backgrounds/skazki_ii.png');
   background-size: cover;
-  background-position: center top;
-  min-height: 100vh;
+  background-position: top center;
 }
 
 .landing-overlay {
@@ -59,11 +59,11 @@
   background-image: linear-gradient(135deg, rgba(10, 6, 22, 0.25), rgba(4, 3, 10, 0.2)), url('/backgrounds/magia.png');
   background-size: cover;
   background-position: center;
-  color: rgba(255, 255, 255, 0.86);
+  color: #ffffff;
   padding: 16px 44px;
   border-radius: 999px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: 0.2px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   cursor: pointer;

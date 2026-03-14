@@ -6,10 +6,11 @@ import { DoorSelect } from "./components/DoorSelect";
 import { StoryWizard } from "./components/StoryWizard";
 import { StoryReader } from "./components/StoryReader";
 import { MyStories } from "./components/MyStories";
+import { StoryContents } from "./components/StoryContents";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./App.css";
 
-type AppScreen = "landing" | "menu" | "stories" | "wizard" | "reader";
+type AppScreen = "landing" | "menu" | "stories" | "wizard" | "contents" | "reader";
 
 function App() {
   const [screen, setScreen] = useState<AppScreen>("landing");
@@ -104,12 +105,23 @@ function App() {
   const handleOpenStory = (story: Story) => {
     const firstChapter = story.chapters?.[0] || null;
     setCurrentStory({ ...story, currentChapter: firstChapter });
-    setScreen("reader");
+    setScreen("contents");
   };
 
   const handleBackToLibrary = () => {
     setScreen("stories");
     setCurrentStory(null);
+  };
+
+  const handleBackToContents = () => {
+    setScreen("contents");
+  };
+
+  const handleOpenChapter = (chapterIndex: number) => {
+    if (!currentStory) return;
+    const chapter = currentStory.chapters[chapterIndex] || null;
+    setCurrentStory({ ...currentStory, currentChapter: chapter });
+    setScreen("reader");
   };
 
   const handleUpdateStory = (updatedStory: Story) => {
@@ -179,7 +191,15 @@ function App() {
         <StoryReader
           story={currentStory}
           onChapterUpdate={handleUpdateStory}
+          onBack={handleBackToContents}
+        />
+      )}
+
+      {screen === "contents" && currentStory && (
+        <StoryContents
+          story={currentStory}
           onBack={handleBackToLibrary}
+          onSelectChapter={handleOpenChapter}
         />
       )}
 

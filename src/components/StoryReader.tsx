@@ -80,6 +80,7 @@ function getNextChapter(story: Story, current: ChapterNode | null) {
 export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps) {
   const [loading, setLoading] = useState(false);
   const [selectedChoices, setSelectedChoices] = useState<Set<string>>(new Set());
+  const [isFlipping, setIsFlipping] = useState(false);
   const chapter = story.currentChapter;
   const world = story.worldMode ? WORLDS[story.worldMode] : null;
   const defaultBg = world?.backgroundColor || "#1a0f00";
@@ -87,7 +88,7 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
   const inferredChoice = chapter?.selectedChoiceText || guessSelectedChoice(chapter?.choices, nextChapter);
   const visibleChoices = nextChapter && inferredChoice
     ? chapter?.choices.filter((choice) => choice.text === inferredChoice) || []
-    : chapter?.choices || [];
+    : [];
 
   useEffect(() => {
     if (!chapter) {
@@ -96,6 +97,13 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
     }
     setSelectedChoices(inferredChoice ? new Set([inferredChoice]) : new Set());
   }, [chapter?.id, story.id, story.chapters, inferredChoice]);
+
+  useEffect(() => {
+    if (!chapter) return;
+    setIsFlipping(true);
+    const timer = setTimeout(() => setIsFlipping(false), 450);
+    return () => clearTimeout(timer);
+  }, [chapter?.id]);
 
   const handleChoiceSelect = async (choiceText: string) => {
     if (loading) return;
@@ -182,7 +190,7 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
 
   return (
     <div 
-      className="story-reader" 
+      className={`story-reader ${isFlipping ? "page-flip" : ""}`}
       style={{ 
         backgroundColor: defaultBg,
         '--bg-color': defaultBg
@@ -212,21 +220,23 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
           ))}
         </div>
 
-        <div className="choices-section">
-          <h2 className="choices-title">Что будет дальше?</h2>
-          <div className="choices-grid">
-            {visibleChoices.map((choice) => (
-              <button
-                key={choice.id}
-                className={`choice-button ${selectedChoices.has(choice.text) ? 'choice-selected' : ''}`}
-                onClick={() => handleChoiceSelect(choice.text)}
-                disabled={loading}
-              >
-                {choice.text}
-              </button>
-            ))}
+        {visibleChoices.length > 0 && (
+          <div className="choices-section">
+            <h2 className="choices-title">Что будет дальше?</h2>
+            <div className="choices-grid">
+              {visibleChoices.map((choice) => (
+                <button
+                  key={choice.id}
+                  className={`choice-button ${selectedChoices.has(choice.text) ? 'choice-selected' : ''}`}
+                  onClick={() => handleChoiceSelect(choice.text)}
+                  disabled={loading}
+                >
+                  {choice.text}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {loading && <div className="loading-indicator">⏳ Создаём следующую главу...</div>}
       </div>

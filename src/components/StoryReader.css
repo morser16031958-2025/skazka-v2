@@ -5,6 +5,11 @@
   color: #f0ead6;
 }
 
+.story-reader.page-flip .content-wrapper {
+  animation: pageFlip 0.45s ease;
+  transform-origin: left center;
+}
+
 .story-reader.empty {
   display: flex;
   flex-direction: column;
@@ -185,6 +190,17 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes pageFlip {
+  0% {
+    opacity: 0.6;
+    transform: rotateY(-15deg) translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: rotateY(0deg) translateX(0);
   }
 }
 
