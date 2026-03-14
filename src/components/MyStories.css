@@ -1,0 +1,338 @@
+.my-stories {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stories-background {
+  position: absolute;
+  inset: 0;
+  background-image: url('/backgrounds/biblio.png');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.35;
+  z-index: 0;
+}
+
+.stories-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 5, 20, 0.82);
+  z-index: 1;
+}
+
+.stories-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 32px 24px 16px;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.stories-header h1 {
+  font-size: 2rem;
+  font-family: Georgia, serif;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+.btn-new-story {
+  background: rgba(255, 255, 255, 0.95);
+  color: #0a0a0f;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-new-story:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-back-menu {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  padding: 0.75rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-back-menu:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.empty-state {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 3rem;
+  text-align: center;
+  margin: 0 24px;
+}
+
+.empty-state p {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0.5rem 0;
+}
+
+.empty-state p:first-child {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.btn-primary {
+  background: rgba(255, 255, 255, 0.95);
+  color: #0a0a0f;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-top: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.stories-grid {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  padding: 0 24px;
+  flex-grow: 1;
+}
+
+.stories-shelves {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  padding: 0 24px 2rem;
+}
+
+.world-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.shelf-title {
+  font-size: 1.4rem;
+  font-family: Georgia, serif;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.story-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+.story-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-4px);
+}
+
+.story-images {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  height: 180px;
+}
+
+.story-image-item {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.story-image-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.story-image-item .placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.story-image-item .image-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.7rem;
+  text-align: center;
+  padding: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.story-card-content {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.story-card-image .placeholder {
+  font-size: 4rem;
+}
+
+.story-card-content {
+  padding: 1.5rem;
+  flex-grow: 1;
+}
+
+.story-card-content h3 {
+  font-size: 1.3rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.3;
+  font-family: Georgia, serif;
+}
+
+.story-card-content .description {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0.5rem 0 1rem 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.story-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.chapter-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.story-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-read,
+.btn-delete {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.btn-read {
+  background: rgba(255, 255, 255, 0.9);
+  color: #0a0a0f;
+}
+
+.btn-read:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-delete {
+  background: rgba(255, 100, 100, 0.2);
+  color: rgba(255, 200, 200, 0.9);
+}
+
+.btn-delete:hover {
+  background: rgba(255, 100, 100, 0.3);
+}
+
+@media (max-width: 768px) {
+  .stories-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 24px 16px 16px;
+  }
+
+  .stories-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .header-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .btn-new-story,
+  .btn-back-menu {
+    width: 100%;
+    text-align: center;
+  }
+
+  .stories-grid {
+    grid-template-columns: 1fr;
+    padding: 0 16px 1.5rem;
+    gap: 1rem;
+  }
+
+  .empty-state {
+    margin: 0 16px;
+    padding: 2rem;
+  }
+}
