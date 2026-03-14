@@ -61,6 +61,7 @@ export function StoryWizard({ worldMode, onStoryCreated, onCancel }: StoryWizard
         id: uuidv4(),
         title: `История из ${world.name}`,
         worldMode,
+        ageLabel: world.ageLabel,
         worldDescription: setup.worldDescription,
         heroDescription: setup.heroDescription,
         antagonistDescription: setup.antagonistDescription,

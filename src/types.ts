@@ -18,6 +18,7 @@ export interface Story {
   id: string;
   title: string;
   worldMode: WorldMode;
+  ageLabel?: string;
   worldDescription: string;
   heroDescription: string;
   antagonistDescription: string;

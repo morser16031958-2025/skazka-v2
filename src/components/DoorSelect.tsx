@@ -4,6 +4,7 @@ import "./DoorSelect.css";
 
 interface DoorSelectProps {
   onSelect: (worldMode: WorldMode) => void;
+  onBack: () => void;
 }
 
 const WORLD_IMAGES: Record<WorldMode, string> = {
@@ -46,13 +47,17 @@ const titleVariants: Variants = {
   },
 };
 
-export function DoorSelect({ onSelect }: DoorSelectProps) {
+export function DoorSelect({ onSelect, onBack }: DoorSelectProps) {
   const worldModes = Object.keys(WORLDS) as WorldMode[];
 
   return (
     <div className="door-select">
       <div className="door-background" />
       <div className="door-overlay" />
+
+      <button className="door-back-button" onClick={onBack}>
+        ← Назад
+      </button>
       
       <motion.h1
         className="main-title"

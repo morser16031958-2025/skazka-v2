@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Story, ChapterNode } from "../types";
 import { generateChapter, generateImage } from "../services/ai";
@@ -17,6 +17,10 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
   const chapter = story.currentChapter;
   const world = story.worldMode ? WORLDS[story.worldMode] : null;
   const defaultBg = world?.backgroundColor || "#1a0f00";
+
+  useEffect(() => {
+    setSelectedChoices(new Set());
+  }, [chapter?.id, story.id]);
 
   const handleChoiceSelect = async (choiceText: string) => {
     if (loading) return;
@@ -40,7 +44,7 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
       let sceneImageUrl = "";
       try {
         if (response.scene_image_prompt) {
-          sceneImageUrl = await generateImage(response.scene_image_prompt);
+          sceneImageUrl = await generateImage(response.scene_image_prompt, world?.imageStyleSuffix);
         }
       } catch (imgError) {
         console.warn("Failed to generate scene image:", imgError);
@@ -79,7 +83,7 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
       <div className="story-reader empty">
         <p>История не начата</p>
         <button className="btn-back-menu" onClick={onBack}>
-          ← Меню
+          ← Назад
         </button>
       </div>
     );
@@ -93,10 +97,6 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
         '--bg-color': defaultBg
       } as React.CSSProperties & { '--bg-color': string }}
     >
-      <button className="btn-back-menu" onClick={onBack}>
-        ← Меню
-      </button>
-
       {chapter.scene_image_url && (
         <div className="image-container">
           <img src={chapter.scene_image_url} alt={chapter.title} className="scene-image" />
@@ -104,8 +104,16 @@ export function StoryReader({ story, onChapterUpdate, onBack }: StoryReaderProps
         </div>
       )}
 
+      <div className="reader-back-row">
+        <button className="btn-back-menu reader-back-button" onClick={onBack}>
+          ← Назад
+        </button>
+      </div>
+
       <div className="content-wrapper">
-        <h1 className="chapter-title">{chapter.title}</h1>
+        <h1 className="chapter-title">
+          {`Глава ${Math.max(1, story.chapters.findIndex((c) => c.id === chapter.id) + 1)}. ${chapter.title}`}
+        </h1>
 
         <div className="narration">
           {chapter.narration_text.split('\n\n').map((paragraph, idx) => (

@@ -130,9 +130,10 @@ ${choiceText ? `Выбор читателя: ${choiceText}` : "Это перва
 /**
  * Генерировать картинку (prompt уже содержит стиль от клиента)
  */
-export async function generateImage(prompt: string): Promise<string> {
+export async function generateImage(prompt: string, styleSuffix?: string): Promise<string> {
+  const fullPrompt = styleSuffix ? `${prompt}. ${styleSuffix}` : prompt;
   const result = await callLocalApi<{ imageUrl: string }>("/api/ai/generate-image", {
-    prompt,
+    prompt: fullPrompt,
   });
 
   if (!result?.imageUrl) {
@@ -149,23 +150,24 @@ export async function generateWorldSetup(
   worldMode: WorldMode
 ): Promise<WorldSetupResponse> {
   const world = WORLDS[worldMode];
+  const descriptionSystemPrompt = `Ты создаёшь краткие описания для детских историй. Возвращай только валидный JSON с полем "description". Используй русский язык.`;
 
   // Три параллельных запроса для описаний
   const [worldResp, heroResp, antagonistResp] = await Promise.all([
     callLocalApi<{ description: string }>("/api/ai/generate-chapter", {
       worldMode,
-      systemPrompt: world.systemPrompt,
-      prompt: `Создай краткое описание волшебного мира для ${world.ageLabel}. ${world.description}. Верни JSON с полем "description" (100-200 слов).`,
+      systemPrompt: descriptionSystemPrompt,
+      prompt: `Создай краткое описание волшебного мира для ${world.ageLabel}. ${world.description}. Верни JSON с полем "description".`,
     }),
     callLocalApi<{ description: string }>("/api/ai/generate-chapter", {
       worldMode,
-      systemPrompt: world.systemPrompt,
-      prompt: `Создай описание главного героя для истории в мире: "${world.name}". Герой должен быть интересным для ${world.ageLabel}. Верни JSON с полем "description" (100-150 слов).`,
+      systemPrompt: descriptionSystemPrompt,
+      prompt: `Создай описание главного героя для истории в мире: "${world.name}". Герой должен быть интересным для ${world.ageLabel}. Верни JSON с полем "description".`,
     }),
     callLocalApi<{ description: string }>("/api/ai/generate-chapter", {
       worldMode,
-      systemPrompt: world.systemPrompt,
-      prompt: `Создай описание антагониста или препятствия для истории. Это не обязательно враг, может быть загадкой или испытанием. Верни JSON с полем "description" (100-150 слов).`,
+      systemPrompt: descriptionSystemPrompt,
+      prompt: `Создай описание антагониста или препятствия для истории. Это не обязательно враг, может быть загадкой или испытанием. Верни JSON с полем "description".`,
     }),
   ]);
 
@@ -175,9 +177,9 @@ export async function generateWorldSetup(
 
   // Генерируем картинки
   const [worldImage, heroImage, antagonistImage] = await Promise.all([
-    generateImage(worldDescription).catch(() => ""),
-    generateImage(heroDescription).catch(() => ""),
-    generateImage(antagonistDescription).catch(() => ""),
+    generateImage(worldDescription, world.imageStyleSuffix).catch(() => ""),
+    generateImage(heroDescription, world.imageStyleSuffix).catch(() => ""),
+    generateImage(antagonistDescription, world.imageStyleSuffix).catch(() => ""),
   ]);
 
   return {

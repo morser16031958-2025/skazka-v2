@@ -1,5 +1,5 @@
 import { Story } from "../types";
-import { WORLDS } from "../config/worlds";
+import { WorldMode, WORLDS } from "../config/worlds";
 import "./MyStories.css";
 
 interface MyStoriesProps {
@@ -10,61 +10,81 @@ interface MyStoriesProps {
   onBack: () => void;
 }
 
+const WORLD_ORDER = Object.keys(WORLDS) as WorldMode[];
+const WORLD_MAP = WORLDS as Record<string, (typeof WORLDS)[WorldMode]>;
+
+function normalizeWorldMode(mode?: string) {
+  if (mode === "fairy_tale") return "fairytale";
+  return mode;
+}
+
+function getWorldByMode(mode?: string) {
+  const normalized = normalizeWorldMode(mode);
+  if (!normalized) return null;
+  return WORLD_MAP[normalized] || null;
+}
+
 function sortStories(stories: Story[]): Story[] {
-  const defaultWorld = {
-    name: "Другие",
-    ageLabel: "zzz",
-    description: "",
-    buttonText: "",
-    systemPrompt: "",
-    imageStyleSuffix: "",
-    textLength: { min: 0, max: 0 },
-    accentColor: "#666",
-    backgroundColor: "#000"
+  const getWorldIndex = (worldMode?: string) => {
+    const normalized = normalizeWorldMode(worldMode);
+    if (!normalized) return Number.MAX_SAFE_INTEGER;
+    const index = WORLD_ORDER.indexOf(normalized as WorldMode);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
   };
-  
+
   return [...stories].sort((a, b) => {
-    const worldA = a.worldMode && WORLDS[a.worldMode] ? WORLDS[a.worldMode] : defaultWorld;
-    const worldB = b.worldMode && WORLDS[b.worldMode] ? WORLDS[b.worldMode] : defaultWorld;
-    
-    // По возрасту
-    if (worldA.ageLabel !== worldB.ageLabel) {
-      return worldA.ageLabel.localeCompare(worldB.ageLabel);
-    }
-    // По названию мира
-    if (a.worldDescription !== b.worldDescription) {
-      return (a.worldDescription || "").localeCompare(b.worldDescription || "");
-    }
-    // По герою
-    if (a.heroDescription !== b.heroDescription) {
-      return (a.heroDescription || "").localeCompare(b.heroDescription || "");
-    }
-    // По антигерою
-    return (a.antagonistDescription || "").localeCompare(b.antagonistDescription || "");
+    const worldIndexA = getWorldIndex(a.worldMode);
+    const worldIndexB = getWorldIndex(b.worldMode);
+    if (worldIndexA !== worldIndexB) return worldIndexA - worldIndexB;
+
+    const worldA = getWorldByMode(a.worldMode);
+    const worldB = getWorldByMode(b.worldMode);
+    const worldNameA = worldA?.name || "Другие";
+    const worldNameB = worldB?.name || "Другие";
+    if (worldNameA !== worldNameB) return worldNameA.localeCompare(worldNameB);
+
+    return (a.title || "").localeCompare(b.title || "");
   });
 }
 
-function groupByWorld(stories: Story[]): Map<string, Story[]> {
+function groupByWorld(stories: Story[]): Array<{ worldMode: WorldMode | null; worldName: string; stories: Story[] }> {
   const groups = new Map<string, Story[]>();
-  
-  stories.forEach(story => {
-    const worldMode = story.worldMode || "fairytale";
-    const world = WORLDS[worldMode];
+
+  stories.forEach((story) => {
+    const worldMode = story.worldMode || null;
+    const world = getWorldByMode(worldMode || undefined);
     const worldName = world?.name || "Другие";
-    
     if (!groups.has(worldName)) {
       groups.set(worldName, []);
     }
     groups.get(worldName)!.push(story);
   });
-  
-  return groups;
+
+  const orderedWorlds = WORLD_ORDER.map((mode) => ({
+    worldMode: mode,
+    worldName: WORLDS[mode].name,
+    stories: groups.get(WORLDS[mode].name) || []
+  })).filter((group) => group.stories.length > 0);
+
+  const otherStories = groups.get("Другие");
+  if (otherStories && otherStories.length > 0) {
+    orderedWorlds.push({ worldMode: null, worldName: "Другие", stories: otherStories });
+  }
+
+  return orderedWorlds;
 }
 
-export function MyStories({ stories, onSelectStory, onNewStory, onDeleteStory, onBack }: MyStoriesProps) {
+function shortText(text?: string, maxLength: number = 90) {
+  if (!text) return "—";
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxLength) return cleaned;
+  const clipped = cleaned.slice(0, maxLength).replace(/[.,;:!?]?\s*$/, "");
+  return `${clipped}…`;
+}
+
+export function MyStories({ stories, onSelectStory, onNewStory, onDeleteStory: _onDeleteStory, onBack }: MyStoriesProps) {
   const sortedStories = sortStories(stories);
-  const groupedStories = groupByWorld(sortedStories);
-  const worldGroups = Array.from(groupedStories.entries());
+  const worldGroups = groupByWorld(sortedStories);
 
   return (
     <div style={{
@@ -108,54 +128,72 @@ export function MyStories({ stories, onSelectStory, onNewStory, onDeleteStory, o
           </div>
         ) : (
           <div className="stories-shelves">
-            {worldGroups.map(([worldName, worldStories]) => (
-              <div key={worldName} className="world-shelf">
-                <h2 className="shelf-title">{worldName}</h2>
+            {worldGroups.map((group) => (
+              <div key={group.worldName} className="world-shelf">
+                <h2 className="shelf-title">{group.worldName}</h2>
                 <div className="stories-grid">
-                  {worldStories.map((story) => (
-                    <div key={story.id} className="story-card">
-                <div className="story-images">
-                  <div className="story-image-item">
-                    {story.worldImage ? (
-                      <img src={story.worldImage} alt="Мир" />
-                    ) : (
-                      <div className="placeholder">🌍</div>
-                    )}
-                    <span className="image-label">Мир</span>
-                  </div>
-                  <div className="story-image-item">
-                    {story.heroImage ? (
-                      <img src={story.heroImage} alt="Герой" />
-                    ) : (
-                      <div className="placeholder">🦸</div>
-                    )}
-                    <span className="image-label">Герой</span>
-                  </div>
-                  <div className="story-image-item">
-                    {story.antagonistImage ? (
-                      <img src={story.antagonistImage} alt="Антигерой" />
-                    ) : (
-                      <div className="placeholder">⚔️</div>
-                    )}
-                    <span className="image-label">Антигерой</span>
-                  </div>
-                </div>
-                <div className="story-card-content">
-                  <h3>{story.title}</h3>
-                  <div className="story-meta">
-                    <span className="chapter-count">{story.chapters.length} глав(ы)</span>
-                  </div>
-                </div>
-                <div className="story-actions">
-                  <button className="btn-read" onClick={() => onSelectStory(story)}>
-                    📖 Читать
-                  </button>
-                  <button className="btn-delete" onClick={() => onDeleteStory(story.id)}>
-                    🗑️ Удалить
-                  </button>
-                </div>
-              </div>
-                  ))}
+                  {group.stories.map((story) => {
+                    const world = getWorldByMode(story.worldMode);
+                    const ageLabel = story.ageLabel || world?.ageLabel || "Возраст не указан";
+                    return (
+                      <button
+                        key={story.id}
+                        type="button"
+                        className="story-card"
+                        onClick={() => onSelectStory(story)}
+                      >
+                        <div className="story-images">
+                          <div className="story-image-item">
+                            {story.worldImage ? (
+                              <img src={story.worldImage} alt="Мир" />
+                            ) : (
+                              <div className="placeholder">🌍</div>
+                            )}
+                            <span className="image-label">Мир</span>
+                          </div>
+                          <div className="story-image-item">
+                            {story.heroImage ? (
+                              <img src={story.heroImage} alt="Герой" />
+                            ) : (
+                              <div className="placeholder">🦸</div>
+                            )}
+                            <span className="image-label">Герой</span>
+                          </div>
+                          <div className="story-image-item">
+                            {story.antagonistImage ? (
+                              <img src={story.antagonistImage} alt="Антигерой" />
+                            ) : (
+                              <div className="placeholder">⚔️</div>
+                            )}
+                            <span className="image-label">Антигерой</span>
+                          </div>
+                        </div>
+                        <div className="story-card-content">
+                          <div className="story-card-top">
+                            <h3>{story.title}</h3>
+                            <div className="story-descriptions">
+                              <div className="story-description">
+                                <span className="story-description-label">Мир:</span>
+                                <span className="story-description-text">{shortText(story.worldDescription)}</span>
+                              </div>
+                              <div className="story-description">
+                                <span className="story-description-label">Герой:</span>
+                                <span className="story-description-text">{shortText(story.heroDescription)}</span>
+                              </div>
+                              <div className="story-description">
+                                <span className="story-description-label">Антигерой:</span>
+                                <span className="story-description-text">{shortText(story.antagonistDescription)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="story-meta">
+                            <span className="story-age">{ageLabel}</span>
+                            <span className="chapter-count-big">{story.chapters.length} глав</span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}

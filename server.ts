@@ -31,6 +31,7 @@ db.exec(`
     created_at INTEGER,
     updated_at INTEGER,
     world_mode TEXT,
+    age_label TEXT,
     world_description TEXT,
     hero_description TEXT,
     antagonist_description TEXT,
@@ -69,7 +70,7 @@ try {
   }
   
   // Проверяем другие колонки
-  const requiredColumns = ['world_description', 'hero_description', 'antagonist_description', 'world_image', 'hero_image', 'antagonist_image', 'chapters_json'];
+  const requiredColumns = ['age_label', 'world_description', 'hero_description', 'antagonist_description', 'world_image', 'hero_image', 'antagonist_image', 'chapters_json'];
   for (const column of requiredColumns) {
     const hasColumn = tableInfo.some(col => col.name === column);
     if (!hasColumn) {
@@ -154,6 +155,7 @@ function transformStoryFromDB(row: any) {
     id: row.story_id,
     title: row.title,
     worldMode: row.world_mode,
+    ageLabel: row.age_label,
     worldDescription: row.world_description,
     heroDescription: row.hero_description,
     antagonistDescription: row.antagonist_description,
@@ -188,6 +190,7 @@ app.post("/api/stories", (req, res) => {
       id,
       title,
       worldMode,
+      ageLabel,
       worldDescription,
       heroDescription,
       antagonistDescription,
@@ -204,6 +207,7 @@ app.post("/api/stories", (req, res) => {
     const created_at = createdAt || Date.now();
     const updated_at = updatedAt || Date.now();
     const world_mode = worldMode;
+    const age_label = ageLabel;
     const world_description = worldDescription;
     const hero_description = heroDescription;
     const antagonist_description = antagonistDescription;
@@ -226,13 +230,14 @@ app.post("/api/stories", (req, res) => {
 
     db.prepare(`
       INSERT OR REPLACE INTO stories
-      (story_id, created_at, updated_at, world_mode, world_description, hero_description, antagonist_description, world_image, hero_image, antagonist_image, title, chapters_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (story_id, created_at, updated_at, world_mode, age_label, world_description, hero_description, antagonist_description, world_image, hero_image, antagonist_image, title, chapters_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       story_id,
       created_at,
       updated_at,
       world_mode,
+      age_label,
       world_description,
       hero_description,
       antagonist_description,
@@ -279,6 +284,7 @@ const N1N_IMAGE_MODEL = process.env.N1N_IMAGE_MODEL || "gemini-2.5-flash-image";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_TEXT_MODEL = process.env.OPENROUTER_TEXT_MODEL || "google/gemini-2.5-flash";
 const OPENROUTER_IMAGE_MODEL = process.env.OPENROUTER_IMAGE_MODEL || "google/gemini-2.5-flash-image";
+const AI_PROVIDER = (process.env.AI_PROVIDER || (OPENROUTER_API_KEY ? "openrouter" : "n1n")).toLowerCase();
 
 async function sleep(ms: number) {
   return new Promise<void>(resolve => setTimeout(resolve, ms));
@@ -406,6 +412,123 @@ async function callN1nImage(prompt: string, model: string = N1N_IMAGE_MODEL) {
   return null;
 }
 
+async function callOpenRouterJson(prompt: string, systemPrompt: string, model: string = OPENROUTER_TEXT_MODEL) {
+  if (!OPENROUTER_API_KEY) throw new Error("OpenRouter API Key not configured");
+
+  let lastError = "";
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      const delay = Math.min(2000 * Math.pow(2, attempt - 1), 10000);
+      await sleep(delay);
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        signal: controller.signal,
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt }
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 4000
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (resp.status === 401 || resp.status === 403) {
+        throw new Error(`OpenRouter API auth error (${resp.status})`);
+      }
+
+      if (resp.status === 429) {
+        if (attempt < 2) continue;
+        throw new Error("OpenRouter API rate limited");
+      }
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`OpenRouter API error: ${resp.status} - ${text}`);
+      }
+
+      const data = await resp.json() as any;
+      const content = data?.choices?.[0]?.message?.content;
+      if (!content) throw new Error("Empty response from OpenRouter");
+
+      const result = JSON.parse(content.trim().replace(/^```json\n?/, '').replace(/\n?```$/, ''));
+      return result;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      console.error(`[OpenRouter] Attempt ${attempt + 1} failed:`, lastError);
+    }
+  }
+
+  throw new Error(`OpenRouter API failed: ${lastError}`);
+}
+
+async function callOpenRouterImage(prompt: string, model: string = OPENROUTER_IMAGE_MODEL) {
+  if (!OPENROUTER_API_KEY) throw new Error("OpenRouter API Key not configured");
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      await sleep(2000);
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+      const resp = await fetch("https://openrouter.ai/api/v1/images/generations", {
+        signal: controller.signal,
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          prompt,
+          response_format: "b64_json"
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (resp.status === 401 || resp.status === 403) {
+        return null;
+      }
+
+      if (!resp.ok) {
+        continue;
+      }
+
+      const data = await resp.json() as any;
+      const item = data?.data?.[0];
+      if (item?.b64_json) {
+        return `data:image/png;base64,${item.b64_json}`;
+      }
+      if (item?.url) {
+        return item.url;
+      }
+      return null;
+    } catch (e) {
+      console.error(`[OpenRouter Image] Attempt ${attempt + 1} failed:`, e);
+    }
+  }
+
+  return null;
+}
+
 // API: Генерировать главу
 app.post("/api/ai/generate-chapter", async (req, res) => {
   try {
@@ -415,7 +538,9 @@ app.post("/api/ai/generate-chapter", async (req, res) => {
       return res.status(400).json({ error: "Missing systemPrompt or prompt" });
     }
 
-    const result = await callN1nJson(prompt, systemPrompt);
+    const result = AI_PROVIDER === "openrouter"
+      ? await callOpenRouterJson(prompt, systemPrompt)
+      : await callN1nJson(prompt, systemPrompt);
     res.json(result);
   } catch (e) {
     console.error(e);
@@ -431,7 +556,9 @@ app.post("/api/ai/generate-image", async (req, res) => {
       return res.status(400).json({ error: "Missing prompt" });
     }
 
-    const imageUrl = await callN1nImage(prompt);
+    const imageUrl = AI_PROVIDER === "openrouter"
+      ? await callOpenRouterImage(prompt)
+      : await callN1nImage(prompt);
     if (!imageUrl) {
       return res.status(500).json({ error: "Failed to generate image" });
     }

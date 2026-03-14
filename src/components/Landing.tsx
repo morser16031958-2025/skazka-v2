@@ -40,10 +40,10 @@ export function Landing({ onCreateStory, onLibrary }: LandingProps) {
           transition={{ delay: 0.4 }}
         >
           <button className="btn-create" onClick={onCreateStory}>
-            ✨ Создать сказку
+            ✨ Новая сказка
           </button>
           <button className="btn-library" onClick={onLibrary}>
-            📚 Моя библиотека
+            📚 Библиотека
           </button>
         </motion.div>
 

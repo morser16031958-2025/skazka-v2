@@ -17,11 +17,6 @@ function App() {
   const [currentStory, setCurrentStory] = useState<Story | null>(null);
   const [selectedWorldMode, setSelectedWorldMode] = useState<WorldMode | null>(null);
 
-  // Загрузить истории при старте
-  useEffect(() => {
-    loadStories();
-  }, []);
-
   const loadStories = async () => {
     try {
       const response = await fetch("/api/stories");
@@ -35,6 +30,18 @@ function App() {
       console.error("Failed to load stories:", error);
     }
   };
+
+  // Загрузить истории при старте
+  useEffect(() => {
+    loadStories();
+  }, []);
+
+  // Обновлять библиотеку при входе на экран
+  useEffect(() => {
+    if (screen === "stories") {
+      loadStories();
+    }
+  }, [screen]);
 
   const handleDoorSelect = (worldMode: WorldMode) => {
     setSelectedWorldMode(worldMode);
@@ -95,8 +102,14 @@ function App() {
   };
 
   const handleOpenStory = (story: Story) => {
-    setCurrentStory(story);
+    const firstChapter = story.chapters?.[0] || null;
+    setCurrentStory({ ...story, currentChapter: firstChapter });
     setScreen("reader");
+  };
+
+  const handleBackToLibrary = () => {
+    setScreen("stories");
+    setCurrentStory(null);
   };
 
   const handleUpdateStory = (updatedStory: Story) => {
@@ -151,7 +164,7 @@ function App() {
       )}
 
       {screen === "menu" && (
-        <DoorSelect onSelect={handleDoorSelect} />
+        <DoorSelect onSelect={handleDoorSelect} onBack={() => setScreen("landing")} />
       )}
 
       {screen === "wizard" && selectedWorldMode && (
@@ -166,7 +179,7 @@ function App() {
         <StoryReader
           story={currentStory}
           onChapterUpdate={handleUpdateStory}
-          onBack={handleBackToMenu}
+          onBack={handleBackToLibrary}
         />
       )}
 
